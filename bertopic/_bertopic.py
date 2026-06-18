@@ -3578,11 +3578,8 @@ class BERTopic:
             ctfidf_config,
             images,
             warn_no_backend=(embedding_model is None),
+            embedding_model=embedding_model,
         )
-
-        # Replace embedding model if one is specifically chosen
-        if embedding_model is not None:
-            topic_model.embedding_model = select_backend(embedding_model, verbose=topic_model.verbose)
 
         return topic_model
 
@@ -5023,6 +5020,7 @@ def _create_model_from_files(
     ctfidf_config: Mapping[str, Any] | None = None,
     images: Mapping[int, Any] | None = None,
     warn_no_backend: bool = True,
+    embedding_model=None,
 ):
     """Create a BERTopic model from a variety of inputs.
 
@@ -5036,6 +5034,8 @@ def _create_model_from_files(
         ctfidf_config: The config for CountVectorizer and c-TF-IDF
         images: The images per topic
         warn_no_backend: Whether to warn the user if no backend is given
+        embedding_model: An optional pre-loaded embedding model. When supplied,
+                         the saved embedding model name is not fetched from HF.
     """
     params["n_gram_range"] = tuple(params["n_gram_range"])
 
@@ -5046,19 +5046,22 @@ def _create_model_from_files(
     params["n_gram_range"] = tuple(params["n_gram_range"])
 
     # Select HF model through SentenceTransformers
-    try:
-        from sentence_transformers import SentenceTransformer
+    if embedding_model is None:
+        try:
+            from sentence_transformers import SentenceTransformer
 
-        embedding_model = select_backend(SentenceTransformer(params["embedding_model"]))
-    except:  # noqa: E722
-        embedding_model = BaseEmbedder()
+            embedding_model = select_backend(SentenceTransformer(params["embedding_model"]))
+        except:  # noqa: E722
+            embedding_model = BaseEmbedder()
 
-        if warn_no_backend:
-            logger.warning(
-                "You are loading a BERTopic model without explicitly defining an embedding model."
-                " If you want to also load in an embedding model, make sure to use"
-                " `BERTopic.load(my_model, embedding_model=my_embedding_model)`."
-            )
+            if warn_no_backend:
+                logger.warning(
+                    "You are loading a BERTopic model without explicitly defining an embedding model."
+                    " If you want to also load in an embedding model, make sure to use"
+                    " `BERTopic.load(my_model, embedding_model=my_embedding_model)`."
+                )
+    else:
+        embedding_model = select_backend(embedding_model)
 
     if params.get("embedding_model") is not None:
         del params["embedding_model"]
